@@ -5,6 +5,8 @@
 Give your model a short, descriptive name.  
 Example: **VibeFinder 1.0**  
 
+**TasteMatch 1.0**
+
 ---
 
 ## 2. Intended Use  
@@ -16,6 +18,12 @@ Prompts:
 - What kind of recommendations does it generate  
 - What assumptions does it make about the user  
 - Is this for real users or classroom exploration  
+
+TasteMatch takes a small set of stated preferences (favorite genre, favorite mood, a target energy level, and whether the user likes acoustic songs) and returns the top 5 songs from a fixed catalog that best match those preferences. It gives each recommendation with a short explanation, like "genre match (pop) (+25.0)," so the user can see why a song was picked.
+
+The model assumes the user already knows and can state their taste in these specific terms. It doesn't learn from listening history or behavior, and it doesn't ask follow-up questions if a preference is missing or doesn't exist in the catalog. It just scores whatever it's given.
+
+This is a classroom project, not something built for real users.
 
 ---
 
@@ -32,6 +40,12 @@ Prompts:
 
 Avoid code here. Pretend you are explaining the idea to a friend who does not program.
 
+Every song has a genre, a mood, and three numbers: energy, tempo, and acousticness. A user also has a taste profile: a favorite genre, a favorite mood, a target energy, and whether they like acoustic songs or not.
+
+To score a song, the model checks four things. Does the genre match? If yes, add 25 points. Does the mood match? If yes, add 25 points. Is the song's energy close to the user's target energy? The closer it is, the more of 30 possible points it gets. Is the song's acousticness close to what the user wants? Same idea, up to 20 points. Add all four up to get the song's overall score. Then the model just scores every song in the catalog this way and picks the top 5 highest scores.
+
+The starter code had these four scoring pieces stubbed out (just `return self.songs[:k]` with a TODO), so most of my work was writing the actual point math for genre, mood, energy, and acousticness, and writing the explanation strings that show why each song scored the way it did.
+
 ---
 
 ## 4. Data  
@@ -45,6 +59,14 @@ Prompts:
 - Did you add or remove data  
 - Are there parts of musical taste missing in the dataset  
 
+The catalog is `data/songs.csv`. It has 19 songs total. The starter version only had 10, so I added 9 more songs to make the genre and mood spread wider before I did any of the stress testing.
+
+There are 16 different genres across those 19 songs, but genre is not spread evenly. Lofi has 3 songs, pop has 2, and the other 14 genres (rock, ambient, jazz, synthwave, indie pop, classical, hip-hop, reggae, metal, folk, r&b, edm, blues, punk) only have 1 song each. Mood is similar: chill has 3 songs, happy/intense/relaxed/melancholic have 2 each, and the rest (moody, focused, confident, angry, nostalgic, romantic, euphoric, rebellious) only have 1.
+
+Nothing was removed from the starter data, only added to it. 
+
+A big piece of taste that's missing here is anything about lyrics, language, or vocals. There's also no "artist you already like" signal, and no way to tell the system "I like this specific song," since songs are compared purely by genre/mood/energy/acousticness. A user whose taste is really about the artist or the words, not the sound, won't get much out of this.
+
 ---
 
 ## 5. Strengths  
@@ -56,6 +78,12 @@ Prompts:
 - User types for which it gives reasonable results  
 - Any patterns you think your scoring captures correctly  
 - Cases where the recommendations matched your intuition  
+
+The system does well for users whose taste lines up with the catalog's most common tags — pop/happy/high-energy and lofi/chill/low-energy users especially. Their top 5 songs consistently make sense, and my two most "opposite" test profiles (High-Energy Pop vs. Chill Lofi) shared zero songs in their top 5.
+
+I also think the energy and acousticness scoring works the way I'd want it to on its own. A song doesn't need a perfect energy match to score well — it just needs to be close, so a small mismatch doesn't tank a song's score the way a missing genre or mood match does. This "near miss still counts" behavior matched my intuition for how a real recommender should treat continuous features.
+
+The explanations are also a strength. Because every recommendation comes with a breakdown like "genre match (+25.0); energy closeness (+27.6)," it's easy to see exactly why a song was picked, instead of a black-box ranking.
 
 ---
 
@@ -117,6 +145,12 @@ Prompts:
 - Improving diversity among the top results  
 - Handling more complex user tastes  
 
+First, I'd try to implement similarity points for genres and moods that aren't exact to a user's profile. For example, with a user who's favorite genre is "hip hop", a song with the "rap" genre shouldn't get 0 points in that category, but at least partial points.
+
+Second, I'd like to expand the song catalog to help mitigate potential bias of the model only favoring the most popular genres and moods. This should hopefully help underrepresented user profiles by providing them with more better recommendations. Also, once the catalog is bigger, I'd want to test whether the current point values (25/25/30/20) still make sense, or if they need to shift now that there's more data to separate good matches from great ones.
+
+The last and most ambitious way I'd improve the model is to allow users to mark songs as "liked" so I can introduce collaborative based filtering by looking at similarly "liked" songs across all users in TasteMatch.
+
 ---
 
 ## 9. Personal Reflection  
@@ -128,3 +162,9 @@ Prompts:
 - What you learned about recommender systems  
 - Something unexpected or interesting you discovered  
 - How this changed the way you think about music recommendation apps  
+
+Building this made me realize how much of a "recommendation" is really just a weighted point system in disguise. I also didn't realize how many song attributes are taken into account when recommending songs via content-based filtering, other then the main category of song genre.
+
+The most interesting thing I found was how a song (at least in my model) can win by scoring consistently across multiple categories instead of a match in one main category. Gym Hero kept showing up for "Happy Pop" fans even though its mood tag is "intense," not "happy," just because it was strong enough on genre, energy, and acousticness to make up for the missing mood points.
+
+This changed how I think about real recommendation apps. If something as simple as this can already show clear bias toward whatever tags are most common in the data, I can only imagine how much that matters at Spotify's scale, where the data itself shapes who gets seen and who doesn't. A recommender isn't neutral just because it's math — the weights and the data both encode a point of view.
